@@ -25,11 +25,14 @@
 			</el-table-column>
 			<el-table-column prop="englishName" label="英文名称" width="150" sortable>
 			</el-table-column>
-			<el-table-column prop="logo" label="logo" width="150" sortable>
-			</el-table-column>
 			<el-table-column prop="productType.name" label="类型" width="150" sortable>
 			</el-table-column>
 			<el-table-column prop="description" label="描述" min-width="180" sortable>
+			</el-table-column>
+			<el-table-column prop="logo" label="logo" width="150" sortable>
+				<template scope="scope">
+					<img :src="'http://192.168.43.144/'+scope.row.logo" height="50"/>
+				</template>
 			</el-table-column>
 			<el-table-column label="操作" width="150">
 				<!--自定义列显示的模板-->
@@ -94,7 +97,32 @@
 					<el-input v-model="addForm.englishName" auto-complete="off"></el-input>
 				</el-form-item>
 				<el-form-item label="类型" prop="productTypeId">
-					<el-input v-model="addForm.productTypeId" auto-complete="off"></el-input>
+					<div class="block">
+						<el-cascader
+								:options="options"
+								:props="props"
+								v-model="addForm.productTypeId">
+						</el-cascader>
+					</div>
+				</el-form-item>
+				<el-form-item label="logo">
+					<!--
+                    action 必选参数, 上传的地址
+                    on-remove : 删除的回调
+                    file-list : 上传的文件列表
+                    -->
+					<el-upload
+							class="upload-demo"
+							action="http://localhost:1100/services/common/fastdfs"
+							:on-remove="handleRemoveLogo"
+							:file-list="logoList"
+							:on-success="handleSuccess"
+							:multiple="false"
+							:before-upload="handleBeforeUpload"
+							list-type="picture">
+						<el-button size="small" type="primary">点击上传</el-button>
+						<div slot="tip" class="el-upload__tip">只能上传jpg/png文件，且不超过500kb</div>
+					</el-upload>
 				</el-form-item>
 				<el-form-item label="描述">
 					<el-input type="textarea" v-model="addForm.description"></el-input>
@@ -116,6 +144,7 @@
 	export default {
 		data() {
 			return {
+                logoList:[],
 				filters: {
 					keyword: ''
 				},
@@ -132,6 +161,11 @@
 					name: [
 						{ required: true, message: '请输入姓名', trigger: 'blur' }
 					]
+				},
+                options:[],
+                props:{
+				    value: "id",
+                    label: "name"
 				},
 				//编辑界面数据
 				editForm: {
@@ -155,12 +189,35 @@
 					name: '',
 					englishName:'',
 					productTypeId:null,
-                    description:''
+                    description:'',
+                    logo:''
 				}
 
 			}
 		},
 		methods: {
+            //上传之前
+            handleBeforeUpload(){
+                console.debug(this.logoList.length)
+                if(this.logoList.length>0){
+                    this.$message({
+                        message: '只能上传一个文件',
+                        type: 'error'
+                    });
+                    return false;
+                }
+            },
+            //logo上传成功的钩子函数
+            handleSuccess(response, file, fileList){
+                this.addForm.logo = response.restObj;
+                this.logoList = fileList;
+            },
+            //删除图片
+            handleRemoveLogo(file, fileList){
+                console.debug("file",file)
+                console.debug("fileList",fileList)
+                this.logoList = fileList;
+            },
 			//性别显示转换
 			formatSex: function (row, column) {
 				return row.sex == 1 ? '男' : row.sex == 0 ? '女' : '未知';
@@ -183,6 +240,13 @@
                     this.brands = pageList.rows;
                     this.total = pageList.total;
 				})
+			},
+
+			getProductType(){
+			    this.$http.get("/product/productType/list")
+					.then(res=>{
+					    this.options = res.data;
+					})
 			},
 			//删除
 			handleDel: function (index, row) {
@@ -231,11 +295,13 @@
 			//显示新增界面
 			handleAdd: function () {
 				this.addFormVisible = true;
+                this.logoList = [];
 				this.addForm = {
                     name: '',
                     englishName:'',
                     productTypeId:null,
-                    description:''
+                    description:'',
+                    logo:''
 				};
 			},
 			//编辑
@@ -270,6 +336,7 @@
 							this.addLoading = true;
 							//NProgress.start();
 							let para = Object.assign({}, this.addForm);//对象的复制
+							para.productTypeId = para.productTypeId[para.productTypeId.length-1];
 
 							this.$http.post("/product/brand/add",para)
 								.then(res=>{
@@ -335,6 +402,7 @@
 		//相当于jquery的$(function(){})
 		mounted() {
 			this.getBrands();
+			this.getProductType();
 		}
 	}
 
